@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorldCup Live — Football Only</title>
+<style>
+  :root {
+    --bg: #0A0E1A;
+    --card: #131A2B;
+    --card-border: rgba(255,255,255,0.08);
+    --cyan: #22D3EE;
+    --cyan-dim: rgba(34,211,238,0.12);
+    --live-red: #FF3B4E;
+    --text: #F5F7FA;
+    --muted: #8A93A8;
+    --pill-bg: #0F1524;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding-bottom: 40px;
+  }
+  header {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--card-border);
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .brand .cup { color: var(--cyan); }
+  .subtitle {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin-top: 2px;
+  }
+  .viewer-badge {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,0.55);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+  .viewer-badge .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--live-red);
+  }
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 14px 16px 4px;
+    overflow-x: auto;
+  }
+  .tab {
+    flex-shrink: 0;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: var(--pill-bg);
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .tab.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: var(--cyan-dim);
+  }
+  main { padding: 8px 16px 0; }
+  .empty {
+    color: var(--muted);
+    text-align: center;
+    padding: 60px 20px;
+    font-size: 13.5px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px 14px 12px;
+    margin-bottom: 12px;
+  }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .stage-label {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stage-label .ball { color: var(--cyan); }
+  .date-label {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .teams-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .team {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 40%;
+  }
+  .team img {
+    width: 26px; height: 26px; object-fit: contain;
+  }
+  .team span {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .team.away { justify-content: flex-end; text-align: right; }
+  .team.away img { order: 2; }
+  .mid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 60px;
+  }
+  .score {
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .vs {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .status-row {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+  }
+  .live-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,59,78,0.12);
+    border: 1px solid rgba(255,59,78,0.5);
+    color: var(--live-red);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+  .live-pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--live-red);
+    animation: pulse 1.3s infinite;
+  }
+  .countdown {
+    font-size: 12px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .finished-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-style: italic;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,59,78,0.6); }
+    70% { box-shadow: 0 0 0 7px rgba(255,59,78,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,59,78,0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="viewer-badge" id="viewerBadge">
+  <span class="dot"></span>
+  <span id="viewerCount">–</span> watching
+</div>
+
+<header>
+  <div class="brand"><span class="cup">⚽</span> WorldCup Live</div>
+  <div class="subtitle">Football only · Auto-updates as matches happen</div>
+</header>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-tab="live">Live</div>
+  <div class="tab" data-tab="upcoming">Upcoming</div>
+  <div class="tab" data-tab="recent">Recent</div>
+  <div class="tab" data-tab="all">All</div>
+</div>
+
+<main id="main">
+  <div class="empty">Loading matches…</div>
+</main>
+
+<script>
+  let allMatches = [];
+  let activeTab = "live";
+  let sessionId = null;
+
+  const mainEl = document.getElementById("main");
+  const tabsEl = document.getElementById("tabs");
+
+  tabsEl.addEventListener("click", (e) => {
+    const tab = e.target.closest(".tab");
+    if (!tab) return;
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    activeTab = tab.dataset.tab;
+    render();
+  });
+
+  function classify(m) {
+    if (m.status === "IN_PLAY" || m.status === "PAUSED") return "live";
+    if (m.status === "FINISHED") return "recent";
+    return "upcoming"; // SCHEDULED, TIMED, POSTPONED
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString([], {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
+  function countdownStr(iso) {
+    const diff = new Date(iso).getTime() - Date.now();
+    if (diff <= 0) return "starting soon";
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    if (h > 24) {
+      const d = Math.floor(h / 24);
+      return `starts in ${d}d ${h % 24}h`;
+    }
+    return `starts in ${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  function stageName(stage) {
+    const map = {
+      GROUP_STAGE: "Group Stage",
+      LAST_16: "Round of 16",
+      QUARTER_FINALS: "Quarter-final",
+      SEMI_FINALS: "Semi-final",
+      THIRD_PLACE: "Third Place",
+      FINAL: "Final",
+    };
+    return map[stage] || stage;
+  }
+
+  function cardHTML(m) {
+    const kind = classify(m);
+    const homeImg = m.homeCrest ? `<img src="${m.homeCrest}" alt="">` : "";
+    const awayImg = m.awayCrest ? `<img src="${m.awayCrest}" alt="">` : "";
+
+    let statusHTML = "";
+    if (kind === "live") {
+      statusHTML = `<div class="live-pill"><span class="dot"></span>LIVE NOW</div>`;
+    } else if (kind === "recent") {
+      statusHTML = `<div class="finished-label">Full time</div>`;
+    } else {
+      statusHTML = `<div class="countdown" data-live-countdown="${m.utcDate}">${countdownStr(m.utcDate)}</div>`;
+    }
+
+    const scoreOrVs =
+      m.homeScore !== null && m.homeScore !== undefined
+        ? `<div class="score">${m.homeScore} - ${m.awayScore}</div>`
+        : `<div class="vs">VS</div>`;
+
+    return `
+      <div class="card">
+        <div class="card-top">
+          <span class="stage-label"><span class="ball">⚽</span> ${stageName(m.stage)}</span>
+          <span class="date-label">${fmtDate(m.utcDate)}</span>
+        </div>
+        <div class="teams-row">
+          <div class="team home">${homeImg}<span>${m.home}</span></div>
+          <div class="mid">${scoreOrVs}</div>
+          <div class="team away"><span>${m.away}</span>${awayImg}</div>
+        </div>
+        <div class="status-row">${statusHTML}</div>
+      </div>
+    `;
+  }
+
+  function render() {
+    const filtered = allMatches.filter((m) =>
+      activeTab === "all" ? true : classify(m) === activeTab
+    );
+
+    if (filtered.length === 0) {
+      mainEl.innerHTML = `<div class="empty">এখানে এখন কোনো ম্যাচ নেই।</div>`;
+      return;
+    }
+
+    filtered.sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+    mainEl.innerHTML = filtered.map(cardHTML).join("");
+  }
+
+  async function loadMatches() {
+    try {
+      const res = await fetch("/.netlify/functions/matches");
+      const json = await res.json();
+      allMatches = json.matches || [];
+      render();
+    } catch (e) {
+      mainEl.innerHTML = `<div class="empty">ডেটা লোড করতে সমস্যা হচ্ছে, একটু পর আবার চেষ্টা হবে…</div>`;
+    }
+  }
+
+  async function heartbeat() {
+    try {
+      const url = sessionId
+        ? `/.netlify/functions/heartbeat?sid=${sessionId}`
+        : `/.netlify/functions/heartbeat`;
+      const res = await fetch(url);
+      const json = await res.json();
+      sessionId = json.sessionId;
+      document.getElementById("viewerCount").textContent = json.count;
+    } catch (e) {
+      // fail silently, viewer count is cosmetic
+    }
+  }
+
+  // tick the visible countdowns every second without refetching data
+  setInterval(() => {
+    document.querySelectorAll("[data-live-countdown]").forEach((el) => {
+      el.textContent = countdownStr(el.dataset.liveCountdown);
+    });
+  }, 1000);
+
+  loadMatches();
+  heartbeat();
+  setInterval(loadMatches, 60 * 1000);
+  setInterval(heartbeat, 15 * 1000);
+</script>
+
+</body>
+</html>
