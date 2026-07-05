@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Admin — Embed Links</title>
+<style>
+  :root {
+    --bg: #0A0E18;
+    --card: #121729;
+    --card-border: rgba(255,255,255,0.08);
+    --cyan: #22E0EE;
+    --text: #F5F7FA;
+    --muted: #7C879C;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 18px; margin: 0 0 20px; }
+  label { font-size: 12.5px; color: var(--muted); display: block; margin-bottom: 6px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--card-border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  textarea { min-height: 90px; resize: vertical; }
+  button {
+    padding: 11px 20px;
+    border-radius: 10px;
+    border: none;
+    background: var(--cyan);
+    color: #06171b;
+    font-weight: 700;
+    font-size: 13.5px;
+    cursor: pointer;
+    margin-right: 8px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .match-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .link-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--card-border);
+    gap: 8px;
+  }
+  .link-row span { word-break: break-all; }
+  .link-row:last-child { border-bottom: none; }
+  .link-row button {
+    padding: 4px 10px;
+    font-size: 11px;
+    background: rgba(255,71,87,0.15);
+    color: #FF4757;
+    flex-shrink: 0;
+    margin: 0;
+  }
+  #lockScreen { max-width: 320px; margin: 60px auto; text-align: center; }
+  #status { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .hint { font-size: 11px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <h1>Admin Login</h1>
+  <label>Admin Key</label>
+  <input id="adminKeyInput" type="password" placeholder="admin key" />
+  <button id="unlockBtn" style="width:100%;">Enter</button>
+</div>
+
+<div id="panel" style="display:none;">
+  <h1>Embed Link Manager</h1>
+
+  <div class="card">
+    <label>ম্যাচ নাম (ঠিক এভাবে লিখো: Team A vs Team B)</label>
+    <input id="matchKeyInput" type="text" placeholder="Canada vs Morocco" />
+
+    <label>টাইপ</label>
+    <select id="typeSelect">
+      <option value="live">Live (খেলা চলাকালীন)</option>
+      <option value="highlight">Highlight (খেলা শেষের পর)</option>
+    </select>
+
+    <label>Embed কোড পেস্ট করো (পুরো &lt;iframe&gt;...&lt;/iframe&gt; অথবা শুধু YouTube লিংক)</label>
+    <textarea id="embedInput" placeholder='<iframe src="https://www.youtube.com/embed/xxxxxxxxxxx"></iframe>  অথবা  https://youtube.com/watch?v=xxxxxxxxxxx'></textarea>
+    <p class="hint">শুধু YouTube (youtube.com / youtu.be) লিংক/কোড গ্রহণ করা হবে, নিরাপত্তার জন্য।</p>
+
+    <button id="addBtn">Add Link</button>
+    <div id="status"></div>
+  </div>
+
+  <h1 style="margin-top:28px;">বর্তমান লিংকগুলো</h1>
+  <div id="list"></div>
+</div>
+
+<script>
+  const lockScreen = document.getElementById("lockScreen");
+  const panel = document.getElementById("panel");
+  const adminKeyInput = document.getElementById("adminKeyInput");
+  const unlockBtn = document.getElementById("unlockBtn");
+  const matchKeyInput = document.getElementById("matchKeyInput");
+  const typeSelect = document.getElementById("typeSelect");
+  const embedInput = document.getElementById("embedInput");
+  const addBtn = document.getElementById("addBtn");
+  const statusEl = document.getElementById("status");
+  const listEl = document.getElementById("list");
+
+  let adminKey = sessionStorage.getItem("adminKey") || "";
+
+  // Accepts a full <iframe> embed code OR a plain YouTube link/ID, and
+  // always returns a safe https://www.youtube.com/embed/{id} URL, or null
+  // if it isn't a recognizable YouTube reference.
+  function toYouTubeEmbedUrl(input) {
+    input = input.trim();
+
+    let src = input;
+    const iframeMatch = input.match(/src=["']([^"']+)["']/i);
+    if (iframeMatch) src = iframeMatch[1];
+
+    const idMatch = src.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+    if (idMatch) return `https://www.youtube.com/embed/${idMatch[1]}`;
+
+    if (/^[a-zA-Z0-9_-]{11}$/.test(src)) return `https://www.youtube.com/embed/${src}`;
+
+    return null;
+  }
+
+  async function loadData() {
+    const res = await fetch("/.netlify/functions/embeds");
+    const data = await res.json();
+    renderList(data);
+  }
+
+  function renderList(data) {
+    const keys = Object.keys(data);
+    if (keys.length === 0) {
+      listEl.innerHTML = `<p style="color:var(--muted);font-size:13px;">এখনো কোনো লিংক যোগ করা হয়নি।</p>`;
+      return;
+    }
+    listEl.innerHTML = keys.map((matchKey) => `
+      <div class="card">
+        <div class="match-title">${matchKey.replace("::live", " — Live").replace("::highlight", " — Highlight")}</div>
+        ${data[matchKey].map((url) => `
+          <div class="link-row">
+            <span>${url}</span>
+            <button data-remove-match="${matchKey}" data-remove-url="${url}">Remove</button>
+          </div>
+        `).join("")}
+      </div>
+    `).join("");
+
+    listEl.querySelectorAll("[data-remove-match]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        await fetch("/.netlify/functions/embeds", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+          body: JSON.stringify({ matchKey: btn.dataset.removeMatch, embedUrl: btn.dataset.removeUrl }),
+        });
+        loadData();
+      });
+    });
+  }
+
+  unlockBtn.addEventListener("click", async () => {
+    adminKey = adminKeyInput.value.trim();
+    const res = await fetch("/.netlify/functions/embeds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+      body: JSON.stringify({ matchKey: "__test__", embedUrl: "__test__" }),
+    });
+    if (res.status === 401) {
+      alert("ভুল admin key");
+      return;
+    }
+    await fetch("/.netlify/functions/embeds", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+      body: JSON.stringify({ matchKey: "__test__", embedUrl: "__test__" }),
+    });
+    sessionStorage.setItem("adminKey", adminKey);
+    lockScreen.style.display = "none";
+    panel.style.display = "block";
+    loadData();
+  });
+
+  addBtn.addEventListener("click", async () => {
+    const matchName = matchKeyInput.value.trim();
+    const type = typeSelect.value;
+    const embedUrl = toYouTubeEmbedUrl(embedInput.value);
+
+    if (!matchName || !embedUrl) {
+      statusEl.textContent = "ম্যাচের নাম এবং সঠিক YouTube embed কোড/লিংক দাও।";
+      return;
+    }
+
+    const matchKey = `${matchName}::${type}`;
+    const res = await fetch("/.netlify/functions/embeds", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+      body: JSON.stringify({ matchKey, embedUrl }),
+    });
+    if (res.ok) {
+      statusEl.textContent = "যোগ হয়েছে ✓";
+      embedInput.value = "";
+      loadData();
+    } else {
+      statusEl.textContent = "সমস্যা হয়েছে, আবার চেষ্টা করো।";
+    }
+  });
+
+  if (adminKey) {
+    lockScreen.style.display = "none";
+    panel.style.display = "block";
+    loadData();
+  }
+</script>
+
+</body>
+</html>
