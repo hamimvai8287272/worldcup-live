@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WorldCup Live — Football Only</title>
+<style>
+  :root {
+    --bg: #0A0E18;
+    --card: #121729;
+    --card-border: rgba(255,255,255,0.07);
+    --cyan: #22E0EE;
+    --live-red: #FF4757;
+    --text: #F5F7FA;
+    --muted: #7C879C;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    padding-bottom: 30px;
+  }
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--bg);
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+  .icon-btn {
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--muted);
+    font-size: 18px;
+  }
+  .brand { font-size: 21px; font-weight: 800; letter-spacing: 0.01em; color: var(--text); }
+  .brand span { color: var(--cyan); }
+  .header-icons { display: flex; gap: 4px; align-items: center; }
+  .viewer-pill {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10.5px;
+    color: var(--muted);
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    padding: 3px 9px;
+  }
+  .viewer-pill .dot { width:5px; height:5px; border-radius:50%; background: var(--live-red); }
+
+  .tabs { display: flex; gap: 18px; padding: 16px 16px 4px; overflow-x: auto; align-items: center; }
+  .tab {
+    flex-shrink: 0;
+    font-size: 14px;
+    color: var(--muted);
+    font-weight: 600;
+    padding: 8px 4px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .tab.active {
+    color: var(--text);
+    border: 1px solid rgba(255,255,255,0.35);
+    border-radius: 10px;
+    padding: 7px 14px;
+  }
+  .tab.active::before { content: "✓"; color: var(--text); }
+
+  /* ---- Highlights strip ---- */
+  .highlights-wrap { padding: 14px 16px 4px; }
+  .highlights-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .highlights-scroll {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .highlight-card {
+    flex-shrink: 0;
+    width: 150px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 10px;
+    cursor: pointer;
+  }
+  .highlight-thumb {
+    height: 60px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #1c2338, #0f1424);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  .highlight-teams { font-size: 11.5px; font-weight: 700; line-height: 1.3; }
+  .highlight-score { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+
+  main { padding: 6px 14px 0; }
+  .empty { color: var(--muted); text-align: center; padding: 70px 20px; font-size: 13.5px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 14px 14px 16px;
+    margin-bottom: 14px;
+  }
+  .card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+  .league {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .right-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .date-text { font-size: 11.5px; color: var(--cyan); font-variant-numeric: tabular-nums; }
+  .live-tag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,71,87,0.15);
+    border: 1px solid rgba(255,71,87,0.55);
+    color: var(--live-red);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .live-tag .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--live-red);
+    animation: pulse 1.3s infinite;
+  }
+  .card.clickable { cursor: pointer; }
+  .teams-row { display: flex; align-items: center; justify-content: space-between; }
+  .team { display: flex; align-items: center; gap: 10px; width: 38%; }
+  .team img { width: 30px; height: 30px; object-fit: contain; border-radius: 50%; }
+  .team .fallback {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: #1c2338;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .team span { font-size: 15px; font-weight: 700; }
+  .team.away { flex-direction: row-reverse; justify-content: flex-start; text-align: right; }
+  .mid { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; }
+  .score { font-size: 22px; font-weight: 800; }
+  .vs { font-size: 14px; color: var(--muted); font-weight: 800; }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,71,87,0.6); }
+    70% { box-shadow: 0 0 0 6px rgba(255,71,87,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,71,87,0); }
+  }
+
+  /* ---- Watch sheet ---- */
+  .sheet-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 50;
+  }
+  .sheet-overlay.open { display: flex; }
+  .sheet {
+    width: 100%;
+    max-width: 480px;
+    max-height: 88vh;
+    overflow-y: auto;
+    background: var(--card);
+    border-top: 1px solid var(--card-border);
+    border-radius: 20px 20px 0 0;
+    padding: 10px 20px 24px;
+  }
+  .sheet-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.2);
+    margin: 0 auto 16px;
+  }
+  .sheet-title { font-size: 18px; font-weight: 800; margin: 0 0 4px; }
+  .sheet-sub { font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+  .watch-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 13px 16px;
+    margin-bottom: 10px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .watch-link .tag { font-size: 11px; color: var(--muted); font-weight: 500; }
+  .sheet-close {
+    width: 100%;
+    padding: 13px 0;
+    margin-top: 6px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <div class="icon-btn">☰</div>
+    <div class="brand">World<span>Cup</span> Live</div>
+    <div class="header-icons">
+      <div class="viewer-pill"><span class="dot"></span><span id="viewerCount">–</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="tabs" id="tabs">
+  <div class="tab active" data-tab="live">Live</div>
+  <div class="tab" data-tab="upcoming">Upcoming</div>
+</div>
+
+<div class="highlights-wrap" id="highlightsWrap" style="display:none;">
+  <div class="highlights-title">🎬 Highlights</div>
+  <div class="highlights-scroll" id="highlightsScroll"></div>
+</div>
+
+<main id="main">
+  <div class="empty">Loading matches…</div>
+</main>
+
+<div class="sheet-overlay" id="sheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 class="sheet-title" id="sheetTitle">Watch</h2>
+    <p class="sheet-sub" id="sheetSub">অফিসিয়াল সম্প্রচারকারীর মাধ্যমে দেখো — বিনামূল্যে ও বৈধভাবে</p>
+
+    <div id="watchLinks">
+      <a class="watch-link" href="https://toffeelive.com/en" target="_blank" rel="noopener">
+        Toffee দিয়ে দেখো <span class="tag">WiFi/যেকোনো নেটওয়ার্ক</span>
+      </a>
+      <a class="watch-link" href="https://play.google.com/store/apps/details?id=com.banglalink.toffee" target="_blank" rel="noopener">
+        Toffee App ইনস্টল করো <span class="tag">Google Play</span>
+      </a>
+      <a class="watch-link" href="https://www.bioscopeplus.com" target="_blank" rel="noopener">
+        Bioscope+ দিয়ে দেখো <span class="tag">WiFi/যেকোনো নেটওয়ার্ক</span>
+      </a>
+    </div>
+
+    <div id="embedArea"></div>
+
+    <button class="sheet-close" id="sheetClose">Close</button>
+  </div>
+</div>
+
+<script>
+  let allMatches = [];
+  let activeTab = "live";
+  let sessionId = null;
+
+  const mainEl = document.getElementById("main");
+  const tabsEl = document.getElementById("tabs");
+  const highlightsWrap = document.getElementById("highlightsWrap");
+  const highlightsScroll = document.getElementById("highlightsScroll");
+
+  tabsEl.addEventListener("click", (e) => {
+    const tab = e.target.closest(".tab");
+    if (!tab) return;
+    document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+    tab.classList.add("active");
+    activeTab = tab.dataset.tab;
+    render();
+  });
+
+  const LIVE_WINDOW_MS = 2.1 * 60 * 60 * 1000;
+
+  function classify(m) {
+    const s = m.status;
+    if (s === "FINISHED" || s === "AWARDED") return "recent";
+    const kickoff = new Date(m.utcDate).getTime();
+    const now = Date.now();
+    const elapsed = now - kickoff;
+    if (s === "SCHEDULED" || s === "TIMED" || s === "POSTPONED") {
+      if (elapsed > 0 && elapsed < LIVE_WINDOW_MS) return "live";
+      return "upcoming";
+    }
+    if (elapsed > LIVE_WINDOW_MS) return "recent";
+    return "live";
+  }
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return d.toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function countdownStr(iso) {
+    const diff = new Date(iso).getTime() - Date.now();
+    if (diff <= 0) return "starting soon";
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    if (h > 24) {
+      const d = Math.floor(h / 24);
+      return `${d}d ${h % 24}h`;
+    }
+    return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+  }
+
+  function stageName(stage) {
+    const map = {
+      GROUP_STAGE: "Group Stage",
+      LAST_16: "Round of 16",
+      QUARTER_FINALS: "Quarter-final",
+      SEMI_FINALS: "Semi-final",
+      THIRD_PLACE: "Third Place",
+      FINAL: "Final",
+    };
+    return map[stage] || stage || "Football";
+  }
+
+  function crestOrFallback(crest) {
+    return crest ? `<img src="${crest}" alt="">` : `<span class="fallback">⚽</span>`;
+  }
+
+  function matchKeyOf(m) {
+    return `${m.home} vs ${m.away}`;
+  }
+
+  function cardHTML(m) {
+    const kind = classify(m);
+    let rightMeta;
+    if (kind === "live") {
+      rightMeta = `<div class="live-tag"><span class="dot"></span>LIVE</div>`;
+    } else {
+      rightMeta = `<div class="date-text" data-live-countdown="${m.utcDate}">${countdownStr(m.utcDate)}</div>`;
+    }
+
+    const scoreOrVs =
+      m.homeScore !== null && m.homeScore !== undefined
+        ? `<div class="score">${m.homeScore} - ${m.awayScore}</div>`
+        : `<div class="vs">VS</div>`;
+
+    const clickable = kind === "live" ? "clickable" : "";
+    const clickAttr = kind === "live" ? `data-open-watch="${matchKeyOf(m)}::live" data-open-title="${matchKeyOf(m)}"` : "";
+
+    return `
+      <div class="card ${clickable}" ${clickAttr}>
+        <div class="card-top">
+          <div class="league"><span class="cup">🏆</span> ${stageName(m.stage)}</div>
+          <div class="right-meta">${rightMeta}</div>
+        </div>
+        <div class="teams-row">
+          <div class="team home">${crestOrFallback(m.homeCrest)}<span>${m.home}</span></div>
+          <div class="mid">${scoreOrVs}</div>
+          <div class="team away">${crestOrFallback(m.awayCrest)}<span>${m.away}</span></div>
+        </div>
+      </div>
+    `;
+  }
+
+  function highlightCardHTML(m) {
+    const score =
+      m.homeScore !== null && m.homeScore !== undefined
+        ? `${m.home} ${m.homeScore} - ${m.awayScore} ${m.away}`
+        : `${m.home} vs ${m.away}`;
+    return `
+      <div class="highlight-card" data-open-watch="${matchKeyOf(m)}::highlight" data-open-title="${matchKeyOf(m)} — Highlights">
+        <div class="highlight-thumb">▶️</div>
+        <div class="highlight-teams">${m.home} vs ${m.away}</div>
+        <div class="highlight-score">${score}</div>
+      </div>
+    `;
+  }
+
+  function render() {
+    // Live matches always take priority: if any match is live, jump to the
+    // Live tab automatically so it surfaces right away.
+    const hasLive = allMatches.some((m) => classify(m) === "live");
+    if (hasLive && activeTab !== "live" && !window.__userPickedUpcoming) {
+      activeTab = "live";
+      document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
+      document.querySelector('.tab[data-tab="live"]').classList.add("active");
+    }
+
+    const filtered = allMatches.filter((m) => classify(m) === activeTab);
+    if (filtered.length === 0) {
+      mainEl.innerHTML = `<div class="empty">এখানে এখন কোনো ম্যাচ নেই।</div>`;
+    } else {
+      filtered.sort((a, b) => new Date(a.utcDate) - new Date(b.utcDate));
+      mainEl.innerHTML = filtered.map(cardHTML).join("");
+    }
+
+    const finished = allMatches
+      .filter((m) => classify(m) === "recent")
+      .sort((a, b) => new Date(b.utcDate) - new Date(a.utcDate))
+      .slice(0, 10);
+
+    if (finished.length > 0) {
+      highlightsWrap.style.display = "block";
+      highlightsScroll.innerHTML = finished.map(highlightCardHTML).join("");
+    } else {
+      highlightsWrap.style.display = "none";
+    }
+  }
+
+  // Track manual tab choice so auto-jump-to-live doesn't fight the user
+  // every single poll if they deliberately picked Upcoming.
+  tabsEl.addEventListener("click", (e) => {
+    const tab = e.target.closest(".tab");
+    if (!tab) return;
+    window.__userPickedUpcoming = tab.dataset.tab === "upcoming";
+  });
+
+  async function loadMatches() {
+    try {
+      const res = await fetch("/.netlify/functions/matches");
+      const json = await res.json();
+      allMatches = json.matches || [];
+      render();
+    } catch (e) {
+      mainEl.innerHTML = `<div class="empty">ডেটা লোড করতে সমস্যা হচ্ছে, একটু পর আবার চেষ্টা হবে…</div>`;
+    }
+  }
+
+  async function heartbeat() {
+    try {
+      const url = sessionId ? `/.netlify/functions/heartbeat?sid=${sessionId}` : `/.netlify/functions/heartbeat`;
+      const res = await fetch(url);
+      const json = await res.json();
+      sessionId = json.sessionId;
+      document.getElementById("viewerCount").textContent = json.count;
+    } catch (e) {}
+  }
+
+  setInterval(() => {
+    document.querySelectorAll("[data-live-countdown]").forEach((el) => {
+      el.textContent = countdownStr(el.dataset.liveCountdown);
+    });
+  }, 1000);
+
+  loadMatches();
+  heartbeat();
+  setInterval(loadMatches, 60 * 1000);
+  setInterval(heartbeat, 15 * 1000);
+
+  // ---- Watch sheet ----
+  const sheetOverlay = document.getElementById("sheetOverlay");
+  const sheetTitle = document.getElementById("sheetTitle");
+  const sheetSub = document.getElementById("sheetSub");
+  const watchLinks = document.getElementById("watchLinks");
+  const sheetClose = document.getElementById("sheetClose");
+  const embedArea = document.getElementById("embedArea");
+  let allEmbeds = {};
+
+  async function loadEmbeds() {
+    try {
+      const res = await fetch("/.netlify/functions/embeds");
+      allEmbeds = await res.json();
+    } catch (e) {
+      allEmbeds = {};
+    }
+  }
+
+  function renderEmbedArea(matchKey) {
+    const urls = allEmbeds[matchKey] || [];
+    if (urls.length === 0) {
+      embedArea.innerHTML = "";
+      return;
+    }
+    embedArea.innerHTML = `
+      <div id="embedTabs" style="display:flex;gap:6px;margin:14px 0 8px;flex-wrap:wrap;"></div>
+      <div id="embedPlayer" style="position:relative;padding-top:56%;border-radius:12px;overflow:hidden;background:#000;"></div>
+    `;
+    const embedTabsEl = document.getElementById("embedTabs");
+    const playerEl = document.getElementById("embedPlayer");
+    let selectedIdx = 0;
+
+    function showPoster() {
+      playerEl.innerHTML = `
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(circle at 50% 30%,#16203a,#050810);cursor:pointer;" id="posterBtn">
+          <div style="font-size:15px;font-weight:800;letter-spacing:0.04em;color:var(--cyan);">World<span style="color:var(--text);">Hamu</span></div>
+          <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:22px;">▶</div>
+          <div style="font-size:11.5px;color:var(--muted);">চালু করতে ট্যাপ করো</div>
+        </div>
+      `;
+      document.getElementById("posterBtn").addEventListener("click", () => playVideo(selectedIdx));
+    }
+
+    function playVideo(idx) {
+      selectedIdx = idx;
+      const url = urls[idx];
+      const withAutoplay = url + (url.includes("?") ? "&" : "?") + "autoplay=1";
+      playerEl.innerHTML = `
+        <iframe src="${withAutoplay}"
+          style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"
+          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen></iframe>
+      `;
+      embedTabsEl.querySelectorAll("button").forEach((b, i) => {
+        b.style.background = i === idx ? "var(--cyan)" : "rgba(255,255,255,0.05)";
+        b.style.color = i === idx ? "#06171b" : "var(--text)";
+      });
+    }
+
+    embedTabsEl.innerHTML = urls.map((_, i) => `<button data-idx="${i}" style="padding:5px 12px;border-radius:999px;border:1px solid var(--card-border);font-size:11.5px;font-weight:700;background:rgba(255,255,255,0.05);color:var(--text);">Link ${i + 1}</button>`).join("");
+    embedTabsEl.querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => playVideo(Number(b.dataset.idx)));
+    });
+    showPoster();
+  }
+
+  document.addEventListener("click", async (e) => {
+    const card = e.target.closest("[data-open-watch]");
+    if (!card) return;
+    const matchKey = card.dataset.openWatch;
+    const isHighlight = matchKey.endsWith("::highlight");
+
+    sheetTitle.textContent = card.dataset.openTitle;
+    watchLinks.style.display = isHighlight ? "none" : "block";
+    sheetSub.style.display = isHighlight ? "none" : "block";
+
+    sheetOverlay.classList.add("open");
+    await loadEmbeds();
+    renderEmbedArea(matchKey);
+  });
+
+  sheetClose.addEventListener("click", () => sheetOverlay.classList.remove("open"));
+  sheetOverlay.addEventListener("click", (e) => {
+    if (e.target === sheetOverlay) sheetOverlay.classList.remove("open");
+  });
+</script>
+
+</body>
+</html>
