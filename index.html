@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>WorldCup Live — Football Only</title>
+<title>WORLD HAMU — Football Only</title>
 <style>
   :root {
     --bg: #0A0E18;
@@ -105,6 +105,8 @@
     font-size: 20px;
     margin-bottom: 8px;
   }
+  .highlight-thumb img { width: 24px; height: 24px; object-fit: contain; border-radius: 50%; }
+  .highlight-thumb .fallback { width: 24px; height: 24px; border-radius: 50%; background: #232b45; display: flex; align-items: center; justify-content: center; font-size: 12px; }
   .highlight-teams { font-size: 11.5px; font-weight: 700; line-height: 1.3; }
   .highlight-score { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
 
@@ -234,10 +236,24 @@
 </head>
 <body>
 
+<div id="splashScreen" style="position:fixed;inset:0;z-index:200;background:radial-gradient(circle at 20% 10%,#151b30,#05070d 70%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;">
+  <div style="width:110px;height:110px;border-radius:26px;overflow:hidden;background:#121729;border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;">
+    <img src="logo.jpg" alt="World Hamu" style="width:100%;height:100%;object-fit:cover;" />
+  </div>
+  <div style="font-size:22px;font-weight:800;letter-spacing:0.02em;color:var(--text);">WORLD <span style="color:var(--cyan);">HAMU</span></div>
+  <div style="font-size:12.5px;color:var(--muted);">Live football, instant access</div>
+  <div style="width:160px;height:4px;border-radius:2px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:14px;">
+    <div id="splashBar" style="height:100%;width:0%;background:var(--cyan);border-radius:2px;transition:width 1.6s ease;"></div>
+  </div>
+</div>
+
 <header>
   <div class="header-row">
     <div class="icon-btn">☰</div>
-    <div class="brand">World<span>Cup</span> Live</div>
+    <div class="brand" style="display:flex;align-items:center;gap:8px;">
+      <img src="logo.jpg" alt="" style="width:26px;height:26px;border-radius:7px;object-fit:cover;" />
+      WORLD <span>HAMU</span>
+    </div>
     <div class="header-icons">
       <div class="viewer-pill"><span class="dot"></span><span id="viewerCount">–</span></div>
     </div>
@@ -394,7 +410,11 @@
         : `${m.home} vs ${m.away}`;
     return `
       <div class="highlight-card" data-open-watch="${matchKeyOf(m)}::highlight" data-open-title="${matchKeyOf(m)} — Highlights">
-        <div class="highlight-thumb">▶️</div>
+        <div class="highlight-thumb" style="display:flex;align-items:center;justify-content:center;gap:6px;">
+          ${crestOrFallback(m.homeCrest)}
+          <span style="font-size:11px;color:var(--muted);">vs</span>
+          ${crestOrFallback(m.awayCrest)}
+        </div>
         <div class="highlight-teams">${m.home} vs ${m.away}</div>
         <div class="highlight-score">${score}</div>
       </div>
@@ -472,6 +492,16 @@
   setInterval(loadMatches, 60 * 1000);
   setInterval(heartbeat, 15 * 1000);
 
+  // ---- Splash screen ----
+  const splashScreen = document.getElementById("splashScreen");
+  const splashBar = document.getElementById("splashBar");
+  requestAnimationFrame(() => { splashBar.style.width = "100%"; });
+  setTimeout(() => {
+    splashScreen.style.transition = "opacity 0.4s ease";
+    splashScreen.style.opacity = "0";
+    setTimeout(() => splashScreen.remove(), 450);
+  }, 1700);
+
   // ---- Watch sheet ----
   const sheetOverlay = document.getElementById("sheetOverlay");
   const sheetTitle = document.getElementById("sheetTitle");
@@ -490,6 +520,37 @@
     }
   }
 
+  function extractVideoId(embedUrl) {
+    const m = embedUrl.match(/embed\/([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+  }
+
+  // ---- YouTube IFrame API loader (loaded once, queued if called early) ----
+  let ytApiReady = false;
+  let ytApiLoading = false;
+  const ytApiQueue = [];
+
+  function ensureYouTubeApi(callback) {
+    if (ytApiReady) return callback();
+    ytApiQueue.push(callback);
+    if (ytApiLoading) return;
+    ytApiLoading = true;
+    window.onYouTubeIframeAPIReady = function () {
+      ytApiReady = true;
+      ytApiQueue.splice(0).forEach((cb) => cb());
+    };
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+  }
+
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
   function renderEmbedArea(matchKey) {
     const urls = allEmbeds[matchKey] || [];
     if (urls.length === 0) {
@@ -503,11 +564,15 @@
     const embedTabsEl = document.getElementById("embedTabs");
     const playerEl = document.getElementById("embedPlayer");
     let selectedIdx = 0;
+    let ytPlayer = null;
+    let progressTimer = null;
 
     function showPoster() {
+      if (progressTimer) clearInterval(progressTimer);
       playerEl.innerHTML = `
         <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:radial-gradient(circle at 50% 30%,#16203a,#050810);cursor:pointer;" id="posterBtn">
-          <div style="font-size:15px;font-weight:800;letter-spacing:0.04em;color:var(--cyan);">World<span style="color:var(--text);">Hamu</span></div>
+          <div style="width:36px;height:36px;border-radius:9px;overflow:hidden;"><img src="logo.jpg" alt="" style="width:100%;height:100%;object-fit:cover;"></div>
+          <div style="font-size:14px;font-weight:800;letter-spacing:0.04em;color:var(--cyan);">WORLD <span style="color:var(--text);">HAMU</span></div>
           <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;font-size:22px;">▶</div>
           <div style="font-size:11.5px;color:var(--muted);">চালু করতে ট্যাপ করো</div>
         </div>
@@ -517,14 +582,79 @@
 
     function playVideo(idx) {
       selectedIdx = idx;
-      const url = urls[idx];
-      const withAutoplay = url + (url.includes("?") ? "&" : "?") + "autoplay=1";
+      const videoId = extractVideoId(urls[idx]);
+
       playerEl.innerHTML = `
-        <iframe src="${withAutoplay}"
-          style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;"
-          allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
-          allowfullscreen></iframe>
+        <div id="ytHost" style="position:absolute;inset:0;"></div>
+        <div style="position:absolute;top:8px;left:10px;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:0.04em;color:var(--cyan);background:rgba(0,0,0,0.45);padding:3px 9px 3px 3px;border-radius:999px;pointer-events:none;">
+          <img src="logo.jpg" alt="" style="width:16px;height:16px;border-radius:50%;object-fit:cover;">
+          WORLD <span style="color:#fff;">HAMU</span>
+        </div>
+        <div id="customControls" style="position:absolute;left:0;right:0;bottom:0;padding:8px 10px 10px;background:linear-gradient(transparent,rgba(0,0,0,0.75));display:flex;flex-direction:column;gap:6px;">
+          <div id="seekBar" style="position:relative;height:4px;background:rgba(255,255,255,0.25);border-radius:2px;cursor:pointer;">
+            <div id="seekFill" style="position:absolute;top:0;left:0;height:100%;width:0%;background:var(--cyan);border-radius:2px;"></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button id="playPauseBtn" style="background:none;border:none;color:#fff;font-size:18px;padding:0;width:24px;">⏸</button>
+              <span id="timeLabel" style="font-size:11px;color:#dfe6ee;font-variant-numeric:tabular-nums;">0:00 / 0:00</span>
+            </div>
+          </div>
+        </div>
       `;
+
+      const playPauseBtn = document.getElementById("playPauseBtn");
+      const seekBar = document.getElementById("seekBar");
+      const seekFill = document.getElementById("seekFill");
+      const timeLabel = document.getElementById("timeLabel");
+
+      ensureYouTubeApi(() => {
+        if (ytPlayer) {
+          ytPlayer.loadVideoById(videoId);
+          return;
+        }
+        ytPlayer = new YT.Player("ytHost", {
+          videoId,
+          playerVars: {
+            controls: 0,
+            modestbranding: 1,
+            rel: 0,
+            playsinline: 1,
+            iv_load_policy: 3,
+            autoplay: 1,
+          },
+          events: {
+            onReady: (e) => e.target.playVideo(),
+            onStateChange: (e) => {
+              playPauseBtn.textContent = e.data === YT.PlayerState.PLAYING ? "⏸" : "▶";
+            },
+          },
+        });
+
+        progressTimer = setInterval(() => {
+          if (!ytPlayer || typeof ytPlayer.getCurrentTime !== "function") return;
+          const cur = ytPlayer.getCurrentTime() || 0;
+          const dur = ytPlayer.getDuration() || 0;
+          seekFill.style.width = dur ? `${(cur / dur) * 100}%` : "0%";
+          timeLabel.textContent = `${fmtTime(cur)} / ${fmtTime(dur)}`;
+        }, 500);
+      });
+
+      playPauseBtn.addEventListener("click", () => {
+        if (!ytPlayer) return;
+        const state = ytPlayer.getPlayerState();
+        if (state === YT.PlayerState.PLAYING) ytPlayer.pauseVideo();
+        else ytPlayer.playVideo();
+      });
+
+      seekBar.addEventListener("click", (e) => {
+        if (!ytPlayer) return;
+        const rect = seekBar.getBoundingClientRect();
+        const ratio = (e.clientX - rect.left) / rect.width;
+        const dur = ytPlayer.getDuration() || 0;
+        ytPlayer.seekTo(dur * ratio, true);
+      });
+
       embedTabsEl.querySelectorAll("button").forEach((b, i) => {
         b.style.background = i === idx ? "var(--cyan)" : "rgba(255,255,255,0.05)";
         b.style.color = i === idx ? "#06171b" : "var(--text)";
